@@ -28,15 +28,30 @@ app.get("/", function (req, res) {
 	res.send("Hello download");
 });
 
-app.post("/download", async function (req, res) {
-	const files = [
-		"5f2dab86911ff5001706e693.pdf",
-		"5f3589ca3997690017dc8d58.pdf",
-		"5f5b9fc66c4dca00c385f46b-5f35840edfdad44a920da95f.pdf",
-	];
+app.post("/", async function (req, res) {
+	const { name: fileName, files } = req.body;
+
+	if (!files) {
+		return res.status(500).json({ message: "Debe solicitar archivos para descargar" });
+	}
+	if (typeof files !== "object") {
+		return res.status(500).json({ message: "El campo files debe ser un array" });
+	}
+	if (!Array.isArray(files)) {
+		return res.status(500).json({ message: "El campo files debe ser un array" });
+	}
+	if (files.length === 0) {
+		return res.status(500).json({ message: "El campo files debe contener al menos un elemento a descargar" });
+	}
+	if (!files.every((it) => typeof it === "string")) {
+		return res.status(500).json({ message: "El campo files debe contener rutas a descargar" });
+	}
+	if (!files.every((it) => it !== "")) {
+		return res.status(500).json({ message: "El campo files debe contener rutas válidas a descargar" });
+	}
 
 	res.setHeader("Content-Type", "application/zip");
-	res.setHeader("Content-Disposition", 'attachment; filename="gestdoc.zip"');
+	res.setHeader("Content-Disposition", `attachment; filename="${fileName || "descarga"}.zip"`);
 	s3Zip.archive({ s3: s3, bucket: S3_BUCKET }, "", files).pipe(res);
 });
 
