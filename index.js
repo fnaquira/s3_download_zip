@@ -6,8 +6,11 @@ const logger = require("morgan");
 const bodyParser = require("body-parser");
 
 const checkSize = require("./lib/checkSize");
+const checkFolder = require("./lib/checkFolder");
 const downloadFiles = require("./lib/downloadFiles");
-const downloadQueue = require("./queue/index");
+const downloadFolder = require("./lib/downloadFolder");
+const queueFiles = require("./queue/queueFiles");
+const queueFolder = require("./queue/queueFolder");
 
 logger.token("remote-addr", function (req) {
 	return req.headers["x-real-ip"] || req.headers["x-forwarded-for"] || req.connection.remoteAddress;
@@ -21,47 +24,107 @@ app.get("/", function (req, res) {
 	res.send("Hello download");
 });
 
-app.post("/", async function (req, res) {
-	const { name: fileName, files, email } = req.body;
+app.post("/", async function (req, res, next) {
+	try {
+		const { name: fileName, files, folder, email } = req.body;
 
-	if (!email) {
-		return res.status(500).json({ message: "Debe solicitar un correo por si el proceso demora demasiado" });
-	}
-	if (!files) {
-		return res.status(500).json({ message: "Debe solicitar archivos para descargar" });
-	}
-	if (typeof files !== "object") {
-		return res.status(500).json({ message: "El campo files debe ser un array" });
-	}
-	if (!Array.isArray(files)) {
-		return res.status(500).json({ message: "El campo files debe ser un array" });
-	}
-	if (files.length === 0) {
-		return res.status(500).json({ message: "El campo files debe contener al menos un elemento a descargar" });
-	}
-	if (!files.every((it) => typeof it === "string")) {
-		return res.status(500).json({ message: "El campo files debe contener rutas a descargar" });
-	}
-	if (!files.every((it) => it !== "")) {
-		return res.status(500).json({ message: "El campo files debe contener rutas válidas a descargar" });
-	}
+		if (!email) {
+			return next("Debe solicitar un correo por si el proceso demora demasiado");
+		}
+		if (!files && !folder) {
+			return next("Debe solicitar archivos para descargar");
+		}
+		if (folder) {
+			if (typeof folder !== "string") {
+				return next("El campo folder debe ser un string");
+			}
+			if (folder === "") {
+				return next("El campo folder debe ser un string válido");
+			}
+			let isQueueable = false;
 
-	const result = await checkSize(files);
-	if (result < 10 * 1024 * 1024) {
-		//if (result < 10 * 1024) {
-		downloadFiles(fileName, files, res);
-	} else {
-		downloadQueue.add({
-			files,
-			fileName,
-			email,
-		});
-		res.json({
-			message: `Le enviaremos un correo a ${email} cuando su enlace de descarga esté listo`,
-			totalFiles: files.length,
-			estimated: result + " bytes",
-		});
+			const [result, totalFiles] = await checkFolder(folder);
+			console.log(`Folder ${folder} pesa ${result} bytes con ${totalFiles} archivos`);
+			/* Si la descarga pesará más de 10 megas, se procede a enviar a cola de email */
+			if (result > 10 * 1024 * 1024) {
+				isQueueable = true;
+			}
+			/* Si la descarga contiene más de 200 archivos, se procede a enviar a cola de email */
+			if (totalFiles >= 200) {
+				isQueueable = true;
+			}
+
+			if (isQueueable) {
+				console.log("quiere");
+				queueFolder.add({
+					folder,
+					fileName,
+					email,
+				});
+				res.json({
+					message: `Le enviaremos un correo a ${email} cuando su enlace de descarga esté listo`,
+					folder: folder,
+					estimated: result + " bytes",
+				});
+			} else {
+				console.log("directo");
+				downloadFolder(fileName, folder, res);
+			}
+		} else if (files) {
+			if (typeof files !== "object") {
+				return next("El campo files debe ser un array");
+			}
+			if (!Array.isArray(files)) {
+				return next("El campo files debe ser un array");
+			}
+			if (files.length === 0) {
+				return next("El campo files debe contener al menos un elemento a descargar");
+			}
+			if (!files.every((it) => typeof it === "string")) {
+				return next("El campo files debe contener rutas a descargar");
+			}
+			if (!files.every((it) => it !== "")) {
+				return next("El campo files debe contener rutas válidas a descargar");
+			}
+			let isQueueable = false;
+			/* Si la descarga contiene más de 200 archivos, se procede a enviar a cola de email */
+			if (files.length >= 200) {
+				isQueueable = true;
+			}
+
+			let resultSize = 0;
+			if (!isQueueable) {
+				const result = await checkSize(files);
+				resultSize = result;
+				/* Si la descarga pesará más de 10 megas, se procede a enviar a cola de email */
+				if (result > 10 * 1024 * 1024) {
+					isQueueable = true;
+				}
+			}
+
+			if (isQueueable) {
+				queueFiles.add({
+					files,
+					fileName,
+					email,
+				});
+				res.json({
+					message: `Le enviaremos un correo a ${email} cuando su enlace de descarga esté listo`,
+					totalFiles: files.length,
+					estimated: resultSize + " bytes",
+				});
+			} else {
+				downloadFiles(fileName, files, res);
+			}
+		}
+	} catch (err) {
+		if (typeof err === "object") return next(err.toString());
+		next(err);
 	}
+});
+
+app.use((err, req, res, next) => {
+	res.status(500).json({ message: err });
 });
 
 const port = process.env.PORT || 3000;
