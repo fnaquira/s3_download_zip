@@ -7,6 +7,8 @@ const bodyParser = require("body-parser");
 const AWS = require("aws-sdk");
 const s3Zip = require("s3-zip");
 
+const checkSize = require("./lib/checkSize");
+
 const { S3_KEY, S3_SECRET, S3_REGION, S3_BUCKET } = process.env;
 
 AWS.config.update({
@@ -53,9 +55,11 @@ app.post("/", async function (req, res) {
 		return res.status(500).json({ message: "El campo files debe contener rutas válidas a descargar" });
 	}
 
-	res.setHeader("Content-Type", "application/zip");
+	/*res.setHeader("Content-Type", "application/zip");
 	res.setHeader("Content-Disposition", `attachment; filename="${fileName || "descarga"}.zip"`);
-	s3Zip.archive({ s3: s3, bucket: S3_BUCKET }, "", files).pipe(res);
+	s3Zip.archive({ s3: s3, bucket: S3_BUCKET }, "", files).pipe(res);*/
+	const result = await checkSize(files);
+	res.json(result);
 });
 
 const port = process.env.PORT || 3000;
