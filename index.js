@@ -29,8 +29,11 @@ app.get("/", function (req, res) {
 });
 
 app.post("/", async function (req, res) {
-	const { name: fileName, files } = req.body;
+	const { name: fileName, files, email } = req.body;
 
+	if (!email) {
+		return res.status(500).json({ message: "Debe solicitar un correo por si el proceso demora demasiado" });
+	}
 	if (!files) {
 		return res.status(500).json({ message: "Debe solicitar archivos para descargar" });
 	}
