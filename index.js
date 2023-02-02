@@ -4,19 +4,10 @@ const express = require("express");
 const app = express();
 const logger = require("morgan");
 const bodyParser = require("body-parser");
-const AWS = require("aws-sdk");
-const s3Zip = require("s3-zip");
 
 const checkSize = require("./lib/checkSize");
-
-const { S3_KEY, S3_SECRET, S3_REGION, S3_BUCKET } = process.env;
-
-AWS.config.update({
-	accessKeyId: S3_KEY,
-	secretAccessKey: S3_SECRET,
-	region: S3_REGION,
-});
-const s3 = new AWS.S3();
+const downloadFiles = require("./lib/downloadFiles");
+const downloadQueue = require("./queue/index");
 
 logger.token("remote-addr", function (req) {
 	return req.headers["x-real-ip"] || req.headers["x-forwarded-for"] || req.connection.remoteAddress;
@@ -55,11 +46,22 @@ app.post("/", async function (req, res) {
 		return res.status(500).json({ message: "El campo files debe contener rutas válidas a descargar" });
 	}
 
-	/*res.setHeader("Content-Type", "application/zip");
-	res.setHeader("Content-Disposition", `attachment; filename="${fileName || "descarga"}.zip"`);
-	s3Zip.archive({ s3: s3, bucket: S3_BUCKET }, "", files).pipe(res);*/
 	const result = await checkSize(files);
-	res.json(result);
+	if (result < 10 * 1024 * 1024) {
+		//if (result < 10 * 1024) {
+		downloadFiles(fileName, files, res);
+	} else {
+		downloadQueue.add({
+			files,
+			fileName,
+			email,
+		});
+		res.json({
+			message: `Le enviaremos un correo a ${email} cuando su enlace de descarga esté listo`,
+			totalFiles: files.length,
+			estimated: result + " bytes",
+		});
+	}
 });
 
 const port = process.env.PORT || 3000;
