@@ -20,6 +20,7 @@
 	},
 	"homepage": "https://github.com/confluxperu/ms_s3_2_zip#readme",
 	"dependencies": {
+		"archiver": "^5.3.1",
 		"aws-sdk": "^2.1302.0",
 		"body-parser": "^1.20.1",
 		"bull": "4.1.1",

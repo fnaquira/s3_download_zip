@@ -81,10 +81,14 @@ app.post("/", async function (req, res, next) {
 				return next("El campo files debe contener al menos un elemento a descargar");
 			}
 			if (!files.every((it) => typeof it === "string")) {
-				return next("El campo files debe contener rutas a descargar");
+				if (files.every((it) => typeof it.path === "string")) {
+					//return next("El campo files debe contener rutas a descargar");
+				} else return next("El campo files debe contener rutas a descargar");
 			}
 			if (!files.every((it) => it !== "")) {
-				return next("El campo files debe contener rutas válidas a descargar");
+				if (files.every((it) => it.path !== "")) {
+					//return next("El campo files debe contener rutas a descargar");
+				} else return next("El campo files debe contener rutas válidas a descargar");
 			}
 			let isQueueable = false;
 			/* Si la descarga contiene más de 200 archivos, se procede a enviar a cola de email */
@@ -101,7 +105,7 @@ app.post("/", async function (req, res, next) {
 					isQueueable = true;
 				}
 			}
-
+			isQueueable = true;
 			if (isQueueable) {
 				queueFiles.add({
 					files,
@@ -114,7 +118,7 @@ app.post("/", async function (req, res, next) {
 					estimated: resultSize + " bytes",
 				});
 			} else {
-				downloadFiles(fileName, files, res);
+				downloadFiles(fileName, files, res, next);
 			}
 		}
 	} catch (err) {
