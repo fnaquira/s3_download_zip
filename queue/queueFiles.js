@@ -51,7 +51,7 @@ downloadQueue.process(2, async (job, done) => {
 		// Agregar el objeto al archivo zip con el nuevo nombre de archivo
 		archive.append(s3Object.Body, { name: filename });
 
-		console.log(`Archivo ${filename} descargado y agregado al archivo zip con el nuevo nombre ${newFilename}`);
+		console.log(`Archivo ${filename} descargado y agregado al archivo zip`);
 	}
 
 	// Finalizar el archivo zip
