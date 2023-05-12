@@ -88,7 +88,7 @@ app.post("/", async function (req, res, next) {
 			}
 			let isQueueable = false;
 			/* Si la descarga contiene más de 200 archivos, se procede a enviar a cola de email */
-			if (files.length >= 200) {
+			if (files.length >= 80) {
 				isQueueable = true;
 			}
 
