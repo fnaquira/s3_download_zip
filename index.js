@@ -105,7 +105,7 @@ app.post("/", async function (req, res, next) {
 					isQueueable = true;
 				}
 			}
-			isQueueable = true;
+
 			if (isQueueable) {
 				queueFiles.add({
 					files,
